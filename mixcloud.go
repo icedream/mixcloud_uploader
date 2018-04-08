@@ -28,7 +28,7 @@ var MINVERSION string
 var OAUTH_CLIENT_ID string
 var OAUTH_CLIENT_SECRET string
 
-var OAUTH_REDIRECT_URI = "http://www.rhythmandpoetry.net/mixcloud_code.php"
+var OAUTH_REDIRECT_URI = "https://test.icedream.tech"
 var API_URL = "https://api.mixcloud.com/upload/?access_token="
 var ACCESS_TOKEN_URL = "https://www.mixcloud.com/oauth/access_token?client_id=" + OAUTH_CLIENT_ID + "&redirect_uri=" + OAUTH_REDIRECT_URI + "&client_secret=" + OAUTH_CLIENT_SECRET + "&code=%s"
 var API_ME_URL = "https://api.mixcloud.com/me?access_token="
