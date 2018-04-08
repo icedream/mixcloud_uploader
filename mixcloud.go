@@ -45,6 +45,9 @@ var configFlag = flag.Bool("config", false, "Configure the application")
 var fileFlag = flag.String("file", "", "The mp3 file to upload to mixcloud")
 var coverFlag = flag.String("cover", "", "The image file to upload to mixcloud as the cover")
 var trackListFlag = flag.String("tracklist", "", "A file containing a tracklist for the cloudcast")
+var titleFlag = flag.String("title", "", "A title for the cloudcast")
+var descriptionFlag = flag.String("description", "", "A description for the cloudcast.")
+var tagsFlag = flag.String("tags", "", "A comma-separated list of tags to apply to the cloudcast.")
 
 var STD_OUT = bufio.NewWriter(colorable.NewColorableStdout())
 var STD_ERR = bufio.NewWriter(colorable.NewColorableStderr())
@@ -252,7 +255,22 @@ func main() {
 
 	writer := multipart.NewWriter(b)
 
-	cast_name, cast_desc, tags_arr := GetBasicInput()
+	var cast_name, cast_desc string
+	var tags_arr []string
+	if titleFlag != nil || descriptionFlag != nil || tagsFlag != nil {
+		// We got flags for name/description/tags, do not ask interactively
+		if titleFlag != nil {
+			cast_name = *titleFlag
+		}
+		if descriptionFlag != nil {
+			cast_desc = *descriptionFlag
+		}
+		if tagsFlag != nil {
+			tags_arr = strings.Split(*tagsFlag, ",")
+		}
+	} else {
+		cast_name, cast_desc, tags_arr = GetBasicInput()
+	}
 
 	BuildBasicHTTPWriter(writer, cast_name, cast_desc, tags_arr, tracklist)
 	AddPremiumToHTTPWriter(writer)
