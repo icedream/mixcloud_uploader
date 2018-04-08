@@ -44,7 +44,7 @@ var aboutFlag = flag.Bool("about", false, "About the application")
 var configFlag = flag.Bool("config", false, "Configure the application")
 var fileFlag = flag.String("file", "", "The mp3 file to upload to mixcloud")
 var coverFlag = flag.String("cover", "", "The image file to upload to mixcloud as the cover")
-var trackListFlag = flag.String("tracklist", "", "A file containing a VirtualDJ Tracklist for the cloudcast")
+var trackListFlag = flag.String("tracklist", "", "A file containing a tracklist for the cloudcast")
 
 var STD_OUT = bufio.NewWriter(colorable.NewColorableStdout())
 var STD_ERR = bufio.NewWriter(colorable.NewColorableStderr())
@@ -240,7 +240,7 @@ func main() {
 	}
 
 	if *trackListFlag != "" {
-		tracklist = parseVirtualDJTrackList(trackListFlag)
+		tracklist = parseTracklist(trackListFlag)
 	}
 
 	if *fileFlag == "" {
@@ -288,7 +288,6 @@ func main() {
 		os.Exit(2)
 	}
 	bar.Finish()
-
 
 	var Response *mixcloud.Response = new(mixcloud.Response)
 
@@ -344,7 +343,7 @@ func printTracklist(tracklist []mixcloud.Track) {
 	}
 }
 
-func parseVirtualDJTrackList(tracklist *string) []mixcloud.Track {
+func parseTracklist(tracklist *string) []mixcloud.Track {
 	var list []mixcloud.Track
 
 	fin, err := os.Open(*tracklist)
@@ -354,50 +353,61 @@ func parseVirtualDJTrackList(tracklist *string) []mixcloud.Track {
 	}
 	defer fin.Close()
 
-	bufReader := bufio.NewReader(fin)
-	var last_track_time_str string = ""
+	/*
+		Example contents:
+		{
+		  "tracklist": [
+		    {
+		      "title": "Intro",
+		      "artist": "",
+		      "label": "",
+		      "url": "",
+		      "time_str": "0:00:00",
+		      "time": "0"
+		    },
+		    {
+		      "title": "Sunstroke (Facade's J to the Y Remix)",
+		      "artist": "Chicane",
+		      "label": "",
+		      "url": "https://soundcloud.com/adamthomasmusic/free-download-chicane-sunstroke-facades-j-to-the-y-remix",
+		      "time_str": "0:01:04",
+		      "time": "64"
+		    },
+		    ...
+		    {
+		      "title": "Isolator",
+		      "artist": "Will Atkinson",
+		      "label": "Subculture",
+		      "url": "",
+		      "time_str": "2:01:31",
+		      "time": "7291"
+		    }
+		  ],
+		  "episode": "007"
+		}
+	*/
 
-	for line, _, err := bufReader.ReadLine(); err != io.EOF; line, _, err = bufReader.ReadLine() {
-		data := strings.Split(string(line), " : ")
-		tracktimestr, track := data[0], data[1]
+	tracklistObj := new(struct {
+		Tracklist []struct {
+			Title      string
+			Artist     string
+			Label      string
+			Url        string
+			TimeString string `json:"time_str"`
+			Time       int
+		}
+	})
+	if err = json.NewDecoder(fin).Decode(tracklistObj); err != nil {
+		fmt.Fprintf(os.Stderr, "The file %s can not be parsed: %s!\n", tracklist, err.Error())
+		return nil
+	}
 
+	for _, entry := range tracklistObj.Tracklist {
 		thistrack := new(mixcloud.Track)
 
-		var trackdata []string = strings.SplitN(string(track), " - ", 2)
-
-		if len(trackdata) != 2 {
-			OutputError("Error parsing track " + string(track) + " at " + tracktimestr)
-			OutputMessage("Please enter an artist for this track: ")
-			artist, err := STD_IN.ReadString('\n')
-			if err != nil {
-				OutputError("Incorrect artist entry.")
-				os.Exit(2)
-			}
-			OutputMessage("Please enter a name for this track: ")
-			track, err := STD_IN.ReadString('\n')
-			if err != nil {
-				OutputError("Incorrect track name entry.")
-				os.Exit(2)
-			}
-
-			trackdata = []string{artist, track}
-		}
-
-		thistrack.Artist = trackdata[0]
-		thistrack.Song = trackdata[1]
-
-		last_time, _ := time.Parse("15:04", last_track_time_str)
-		track_time, err := time.Parse("15:04", tracktimestr)
-		if err != nil {
-			OutputError("Unable to parse time." + err.Error())
-			os.Exit(2)
-		}
-
-		if last_track_time_str != "" {
-			duration := track_time.Sub(last_time)
-			thistrack.Duration = int(duration.Seconds())
-		}
-		last_track_time_str = tracktimestr
+		thistrack.Artist = entry.Artist
+		thistrack.Song = entry.Title
+		thistrack.Time = entry.Time
 
 		list = append(list, *thistrack)
 
@@ -414,7 +424,7 @@ func parseVirtualDJTrackList(tracklist *string) []mixcloud.Track {
 func handleJSONResponse(response mixcloud.Response) bool {
 	if response.Error != nil {
 		OutputError(response.Error.Message)
-		fmt.Printf("%v",response.Details)
+		fmt.Printf("%v", response.Details)
 		return false
 	} else if response.Result.Success {
 		OutputMessage(term.Green + "Sucessfully uploaded file" + term.Reset + "\n")
@@ -423,7 +433,7 @@ func handleJSONResponse(response mixcloud.Response) bool {
 		return true
 	} else {
 		OutputError("Error uploading, no success")
-		fmt.Printf("%v",response)
+		fmt.Printf("%v", response)
 		return false
 	}
 }
@@ -471,18 +481,14 @@ func BuildBasicHTTPWriter(writer *multipart.Writer, name string, desc string, ta
 
 	// Add tracklist
 	if tracklist != nil {
-		var total_duration int = 0
-
 		for i, track := range tracklist {
 			artist_field_name := fmt.Sprintf("sections-%d-artist", i)
 			song_field_name := fmt.Sprintf("sections-%d-song", i)
 			duration_field_name := fmt.Sprintf("sections-%d-start_time", i)
 
-			total_duration += track.Duration
-
 			writer.WriteField(artist_field_name, track.Artist)
 			writer.WriteField(song_field_name, track.Song)
-			writer.WriteField(duration_field_name, fmt.Sprintf("%d", total_duration))
+			writer.WriteField(duration_field_name, fmt.Sprintf("%d", track.Time))
 		}
 	}
 }
@@ -514,13 +520,13 @@ func AddPremiumToHTTPWriter(writer *multipart.Writer) {
 	if publish_date != "" {
 		writer.WriteField("publish_date", publish_date)
 	}
-	if(disable_comments) {
+	if disable_comments {
 		writer.WriteField("disable_comments", "1")
 	}
-	if(hide_stats) {
+	if hide_stats {
 		writer.WriteField("hide_stats", "1")
 	}
-	if(unlisted) {
+	if unlisted {
 		writer.WriteField("unlisted", "1")
 	}
 }
@@ -555,22 +561,21 @@ func GetPremiumInput() (string, bool, bool, bool) {
 	return publish_date, disable_comments, hide_stats, unlisted
 }
 
-func PublishDateInput() (string) {
+func PublishDateInput() string {
 	current_time := time.Now().In(time.Local)
 	zonename, offset := current_time.Zone()
 
-	OutputMessage("Enter a publish date in "+zonename+" ("+fmt.Sprintf("%+d",offset/60/60)+" GMT) [DD/MM/YYYY HH:MM]: ")
+	OutputMessage("Enter a publish date in " + zonename + " (" + fmt.Sprintf("%+d", offset/60/60) + " GMT) [DD/MM/YYYY HH:MM]: ")
 	inPublishDate, err := STD_IN.ReadString('\n')
 	if err != nil {
 		OutputError("Incorrect publish date.")
 		os.Exit(2)
 	}
 
-
 	publish_date := ParseDateInputToTime(inPublishDate)
 
-	if(!publish_date.After(current_time)) {
-		OutputError("Date "+publish_date.Format(time.RFC1123)+" is not in the future")
+	if !publish_date.After(current_time) {
+		OutputError("Date " + publish_date.Format(time.RFC1123) + " is not in the future")
 		return PublishDateInput()
 	}
 
