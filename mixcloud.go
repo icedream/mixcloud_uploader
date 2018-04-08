@@ -48,6 +48,7 @@ var trackListFlag = flag.String("tracklist", "", "A file containing a tracklist 
 var titleFlag = flag.String("title", "", "A title for the cloudcast")
 var descriptionFlag = flag.String("description", "", "A description for the cloudcast.")
 var tagsFlag = flag.String("tags", "", "A comma-separated list of tags to apply to the cloudcast.")
+var configDirFlag = flag.String("config-dir", "", "A custom directory to store the mixcloud uploader configuration in")
 
 var STD_OUT = bufio.NewWriter(colorable.NewColorableStdout())
 var STD_ERR = bufio.NewWriter(colorable.NewColorableStderr())
@@ -214,7 +215,12 @@ func loadConfig() {
 
 func setupApp() {
 	usr, _ := user.Current()
-	CONFIG_FILE_PATH = filepath.Join(usr.HomeDir, ".mixcloud")
+	switch {
+	case configDirFlag == nil:
+		CONFIG_FILE_PATH = filepath.Join(usr.HomeDir, ".mixcloud")
+	default:
+		CONFIG_FILE_PATH = *configDirFlag
+	}
 	CONFIG_FILE = filepath.Join(CONFIG_FILE_PATH, CONFIG_FILE)
 
 	if _, err := os.Stat(CONFIG_FILE_PATH); os.IsNotExist(err) {
