@@ -6,13 +6,7 @@ import (
 	_ "crypto/sha512"
 	"encoding/json"
 	"fmt"
-	"github.com/cheggaaa/pb"
-	"github.com/ruxton/mixcloud/confirm"
-	"github.com/ruxton/mixcloud/mixcloud"
-	"github.com/ruxton/mixcloud/term"
-	"github.com/mattn/go-colorable"
 	"io"
-	flag "launchpad.net/gnuflag"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -20,6 +14,13 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/cheggaaa/pb"
+	"github.com/icedream/mixcloud_uploader/confirm"
+	"github.com/icedream/mixcloud_uploader/mixcloud"
+	"github.com/icedream/mixcloud_uploader/term"
+	flag "github.com/juju/gnuflag"
+	"github.com/mattn/go-colorable"
 )
 
 var VERSION string
